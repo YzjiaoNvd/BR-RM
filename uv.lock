@@ -1,5 +1,5 @@
 version = 1
-revision = 3
+revision = 2
 requires-python = ">=3.12"
 resolution-markers = [
     "python_full_version >= '3.13' and platform_machine != 'aarch64' and sys_platform == 'linux'",
@@ -1972,15 +1972,15 @@ wheels = [
 
 [[package]]
 name = "liger-kernel"
-version = "0.5.8"
+version = "0.6.2"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "torch", version = "2.7.1+cu128", source = { registry = "https://download.pytorch.org/whl/cu128" }, marker = "(platform_machine != 'aarch64' and sys_platform != 'darwin') or sys_platform == 'win32'" },
     { name = "triton", version = "3.3.1", source = { registry = "https://download.pytorch.org/whl/cu128" }, marker = "(platform_machine != 'aarch64' and sys_platform != 'darwin') or sys_platform == 'win32'" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/a2/55/3a703f337110e2a121a04e503abfeec2c191529cbee18bb1fb630d65642a/liger_kernel-0.5.8.tar.gz", hash = "sha256:3246d7dced89e0f982a52de259d4f78fd10eb9171246b28ae52b63ad09fc0732", size = 3593097, upload-time = "2025-04-12T16:44:32.252Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/31/23/be0b4dcac42d77f99406c906567cde22a7a3d71b3f3ffdfda2ac6153ec36/liger_kernel-0.6.2.tar.gz", hash = "sha256:5c5bcffffa769bc26ae838f5a4954170dd5cacde036abb1b383039f39fa5fd69", size = 3679495, upload-time = "2025-08-22T00:15:28.456Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/3d/40/75d82d90062b60e2aedd0b1741fe5b3dfbfd250aedd25933ef0b177b640e/liger_kernel-0.5.8-py3-none-any.whl", hash = "sha256:3102f99f89e9b9da249c83ea3f12b68680a8e8df0e477d4513e232da9af7d1a0", size = 150758, upload-time = "2025-04-12T16:44:30.791Z" },
+    { url = "https://files.pythonhosted.org/packages/94/2c/68d992835e8630c1b94cdcb246ea7eecad790a955037ca3f19b6c01e8215/liger_kernel-0.6.2-py3-none-any.whl", hash = "sha256:303b9bbf5c10f9289c3139afb41e4d989e8c809516624a106b89b064163d971d", size = 192815, upload-time = "2025-08-22T00:15:27.04Z" },
 ]
 
 [[package]]
@@ -2346,6 +2346,21 @@ requires-dist = [
     { name = "wandb" },
     { name = "wrapt" },
     { name = "zarr" },
+]
+
+[[package]]
+name = "megatron-fsdp"
+version = "0.1.0rc2"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "numpy" },
+    { name = "packaging" },
+    { name = "torch", version = "2.7.1", source = { registry = "https://pypi.org/simple" }, marker = "sys_platform == 'darwin'" },
+    { name = "torch", version = "2.7.1+cu128", source = { registry = "https://download.pytorch.org/whl/cu128" }, marker = "sys_platform != 'darwin'" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/83/48/6d6fef0f1c26b90e018d933f07bf1c4b55d2743f7f63c283159250949f66/megatron_fsdp-0.1.0rc2.tar.gz", hash = "sha256:d4c5482ebaa52557a23b3887dfafcc542625564fa848518476fd9209a9f18f94", size = 72027, upload-time = "2025-09-15T04:16:41.792Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/9f/2d/f99a7f9ff5cc89ff6c6158023491931ef9f8cf0681e5d01280c5fb7c561b/megatron_fsdp-0.1.0rc2-py3-none-any.whl", hash = "sha256:5410a8447c62c5edeec6d7f799661b7b7bc4db0dabd4eeafd187c1f121a3a7c2", size = 75936, upload-time = "2025-09-15T04:16:40.472Z" },
 ]
 
 [[package]]
@@ -2728,6 +2743,7 @@ dependencies = [
     { name = "bitsandbytes", marker = "platform_machine == 'x86_64' and sys_platform != 'darwin'" },
     { name = "datasets" },
     { name = "liger-kernel", marker = "platform_machine == 'x86_64' and sys_platform != 'darwin'" },
+    { name = "megatron-fsdp" },
     { name = "pybind11" },
     { name = "pyyaml" },
     { name = "torch", version = "2.7.1", source = { registry = "https://pypi.org/simple" }, marker = "sys_platform == 'darwin'" },
@@ -2741,6 +2757,9 @@ dependencies = [
 [package.optional-dependencies]
 fa = [
     { name = "flash-attn" },
+]
+moe = [
+    { name = "transformer-engine", extra = ["pytorch"] },
 ]
 vlm = [
     { name = "backoff" },
@@ -2788,7 +2807,8 @@ requires-dist = [
     { name = "bitsandbytes", marker = "platform_machine == 'x86_64' and sys_platform != 'darwin'", specifier = "==0.45.5" },
     { name = "datasets", specifier = ">=4.0.0" },
     { name = "flash-attn", marker = "extra == 'fa'", specifier = "<=2.8.3" },
-    { name = "liger-kernel", marker = "platform_machine == 'x86_64' and sys_platform != 'darwin'", specifier = "==0.5.8" },
+    { name = "liger-kernel", marker = "platform_machine == 'x86_64' and sys_platform != 'darwin'", specifier = ">=0.5.9" },
+    { name = "megatron-fsdp" },
     { name = "mistral-common", extras = ["opencv"], marker = "extra == 'vlm'" },
     { name = "numba", marker = "extra == 'vlm'" },
     { name = "numpy", marker = "extra == 'vlm'" },
@@ -2802,11 +2822,12 @@ requires-dist = [
     { name = "torchao" },
     { name = "torchcodec", marker = "extra == 'vlm'" },
     { name = "torchdata" },
+    { name = "transformer-engine", extras = ["pytorch"], marker = "extra == 'moe'", specifier = "==2.5.0" },
     { name = "transformers", specifier = "<=4.55.4" },
     { name = "transformers", marker = "extra == 'vlm'", specifier = "<=4.55.4" },
     { name = "wandb" },
 ]
-provides-extras = ["vlm", "fa"]
+provides-extras = ["vlm", "fa", "moe"]
 
 [package.metadata.requires-dev]
 build = [
