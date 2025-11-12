@@ -38,6 +38,7 @@ ACTOR_ENVIRONMENT_REGISTRY: dict[str, str] = {
     "nemo_rl.environments.games.sliding_puzzle.SlidingPuzzleEnv": PY_EXECUTABLES.SYSTEM,
     "nemo_rl.environments.tools.retriever.RAGEnvironment": PY_EXECUTABLES.SYSTEM,
     "nemo_rl.environments.brrm_environment.BRRMEnvironment": PY_EXECUTABLES.SYSTEM,
+    "nemo_rl.environments.fact_environment.HallucinationEnvironment": PY_EXECUTABLES.SYSTEM,
 }
 
 
