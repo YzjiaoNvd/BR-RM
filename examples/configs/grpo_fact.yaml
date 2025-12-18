@@ -126,8 +126,11 @@ env:
   hallucination:
     num_workers: 1
     format_penalty: -1.0
-    google_api_key: null  # Set via environment variable or here
-    google_cse_id: null   # Set via environment variable or here
+    # NEW: Reward design parameters
+    reward_beta: 1.0e-3        # Tool usage penalty coefficient (β)
+    reward_threshold: 0.7       # F1 threshold for applying tool penalty
+    google_api_key: null
+    google_cse_id: null
     fetch_full_content: false
 
 logger:

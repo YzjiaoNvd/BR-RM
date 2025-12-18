@@ -66,9 +66,11 @@ def run_hallucination_evaluation(vllm_generation, dataloader, tokenizer, google_
             
             # Process claims and perform searches
             all_search_results = []
+            all_num_tool_calls = []  # ← ADDED: Track tool calls per sample
             for claim_response in claim_responses:
                 is_parsed, extracted_claims, _ = parse_claim_extraction_response(claim_response)
                 
+                num_tool_calls = 0  # ← ADDED: Initialize counter
                 if is_parsed and google_client:
                     # Perform searches
                     search_results = []
@@ -84,12 +86,14 @@ def run_hallucination_evaluation(vllm_generation, dataloader, tokenizer, google_
                                     "search_terms": search_terms,
                                     "search_results": formatted
                                 })
+                                num_tool_calls += 1  # ← ADDED: Count each search
                             except Exception as e:
                                 print(f"Search error: {e}")
                 else:
                     search_results = []
                 
                 all_search_results.append(search_results)
+                all_num_tool_calls.append(num_tool_calls)  # ← ADDED: Store count
             
             # STAGE 2: Error detection
             error_prompts = []
@@ -114,8 +118,8 @@ def run_hallucination_evaluation(vllm_generation, dataloader, tokenizer, google_
             error_responses = stage2_outputs.get("texts", [""] * len(error_prompts))
             
             # Process results and calculate F1 scores
-            for idx, (claim_resp, error_resp, metadata) in enumerate(zip(
-                claim_responses, error_responses, batch["extra_env_info"]
+            for idx, (claim_resp, error_resp, metadata, num_tools) in enumerate(zip(
+                claim_responses, error_responses, batch["extra_env_info"], all_num_tool_calls
             )):
                 is_valid, detected_errors, _ = parse_error_detection_response(error_resp)
                 
@@ -124,6 +128,7 @@ def run_hallucination_evaluation(vllm_generation, dataloader, tokenizer, google_
                     "claim_extraction_response": claim_resp,
                     "error_detection_response": error_resp,
                     "detected_errors": detected_errors if is_valid else [],
+                    "num_tool_calls": num_tools,  # ← ADDED: Include tool call count
                     "metadata": metadata,
                 }
                 
@@ -134,6 +139,16 @@ def run_hallucination_evaluation(vllm_generation, dataloader, tokenizer, google_
                         metadata["ground_truth_errors"]
                     )
                     result["f1_score"] = f1_score
+                    
+                    # ← ADDED: Calculate reward with tool penalty
+                    from nemo_rl.environments.fact_environment import calculate_overall_reward
+                    reward = calculate_overall_reward(
+                        f1_score=f1_score,
+                        num_tool_calls=num_tools,
+                        beta=1e-3,  # Could be read from config
+                        threshold=0.7
+                    )
+                    result["reward"] = reward
                 
                 results.append(result)
                 
@@ -158,6 +173,7 @@ def calculate_metrics(results):
     """Calculate evaluation metrics."""
     total_samples = len(results)
     samples_with_f1 = [r for r in results if "f1_score" in r]
+    samples_with_reward = [r for r in results if "reward" in r]  # ← ADDED
     
     if samples_with_f1:
         f1_scores = [r["f1_score"] for r in samples_with_f1]
@@ -169,6 +185,15 @@ def calculate_metrics(results):
         print(f"  Mean F1 score: {mean_f1:.3f}")
         print(f"  Max F1 score: {max(f1_scores):.3f}")
         print(f"  Min F1 score: {min(f1_scores):.3f}")
+        
+        # ← ADDED: Report reward metrics
+        if samples_with_reward:
+            rewards = [r["reward"] for r in samples_with_reward]
+            tool_calls = [r["num_tool_calls"] for r in samples_with_reward]
+            print(f"\n  Mean reward (with tool penalty): {sum(rewards)/len(rewards):.4f}")
+            print(f"  Mean tool calls: {sum(tool_calls)/len(tool_calls):.1f}")
+            print(f"  Max tool calls: {max(tool_calls)}")
+            print(f"  Min tool calls: {min(tool_calls)}")
     else:
         print(f"\nNo F1 scores calculated (no ground truth available)")
 

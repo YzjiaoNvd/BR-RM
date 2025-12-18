@@ -87,6 +87,7 @@ def hallucination_data_processor(
         "claim_extraction_complete": False,
         "extracted_claims": None,
         "search_results": None,
+        "num_tool_calls": 0,
     }
     
     return DatumSpec(

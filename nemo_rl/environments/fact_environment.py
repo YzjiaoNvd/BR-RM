@@ -105,6 +105,7 @@ class HallucinationMetadata(TypedDict):
     claim_extraction_complete: Optional[bool]
     extracted_claims: Optional[List[Dict[str, str]]]
     search_results: Optional[List[Dict[str, str]]]
+    num_tool_calls: Optional[int]  # Track number of search tool calls
 
 # ========================= PROMPT FORMATTING =========================
 
@@ -381,7 +382,10 @@ class GoogleSearchClient:
 # ========================= F1 SCORE CALCULATION =========================
 
 def calculate_f1_score(predicted_errors: List[Dict], ground_truth_errors: List[Dict]) -> float:
-    """Calculate F1 score for error detection."""
+    """Calculate F1 score for error detection.
+    
+    Note: This could be replaced with an LLM-as-judge approach for more nuanced evaluation.
+    """
     if not ground_truth_errors and not predicted_errors:
         return 1.0  # Perfect score if both are empty
     
@@ -420,6 +424,45 @@ def calculate_f1_score(predicted_errors: List[Dict], ground_truth_errors: List[D
     f1 = 2 * (precision * recall) / (precision + recall)
     return f1
 
+# ========================= NEW REWARD CALCULATION =========================
+
+def calculate_overall_reward(
+    f1_score: float,
+    num_tool_calls: int,
+    beta: float = 1e-3,
+    threshold: float = 0.7
+) -> float:
+    """Calculate overall reward with tool usage penalty.
+    
+    Formula: R_Overall = R_Outcome - beta * R_Tool * (R_Outcome >= threshold)
+    
+    Args:
+        f1_score: The outcome reward (F1 score between 0 and 1)
+        num_tool_calls: Number of search tool calls made
+        beta: Penalty coefficient for tool usage (default: 1e-3)
+        threshold: F1 score threshold above which tool penalty applies (default: 0.7)
+    
+    Returns:
+        Overall reward value
+        
+    Principle:
+        - If the final outcome is good (>= threshold), reward for fewer tool calls
+        - If outcome is poor (< threshold), don't penalize tool usage
+    """
+    # R_Outcome: F1 score (0 to 1)
+    r_outcome = f1_score
+    
+    # R_Tool: Number of tool calls
+    r_tool = float(num_tool_calls)
+    
+    # Apply tool penalty only if outcome is above threshold
+    tool_penalty = beta * r_tool if r_outcome >= threshold else 0.0
+    
+    # Calculate overall reward
+    r_overall = r_outcome - tool_penalty
+    
+    return r_overall
+
 # ========================= HALLUCINATION DETECTION ENVIRONMENT =========================
 
 @ray.remote
@@ -429,6 +472,10 @@ class HallucinationEnvironment(EnvironmentInterface):
     def __init__(self, cfg: dict):
         self.cfg = cfg
         self.format_penalty = cfg.get("format_penalty", -1.0)
+        
+        # Reward parameters
+        self.reward_beta = cfg.get("reward_beta", 1e-3)
+        self.reward_threshold = cfg.get("reward_threshold", 0.7)
         
         # Initialize Google Search Client if API keys are provided
         self.google_client = None
@@ -450,21 +497,25 @@ class HallucinationEnvironment(EnvironmentInterface):
         
         logging.basicConfig(level=logging.INFO)
     
-    def _perform_google_search(self, claims: List[Dict[str, str]]) -> List[Dict[str, Any]]:
-        """Perform Google search for extracted claims."""
+    def _perform_google_search(self, claims: List[Dict[str, str]]) -> Tuple[List[Dict[str, Any]], int]:
+        """Perform Google search for extracted claims and return results with tool call count.
+        
+        Returns:
+            Tuple of (search_results, num_tool_calls)
+        """
         if not self.google_client:
             # Return mock results for testing
             return [
                 {
-                    #"claim": claim["claim"],
-                    #"key_element": claim["key_element"],
                     "search_terms": claim["search_terms"],
                     "search_results": "No search results available (Google API not configured)"
                 }
                 for claim in claims
-            ]
+            ], 0
         
         results = []
+        num_tool_calls = 0
+        
         for claim in claims[:5]:  # Limit to 5 claims to avoid too many API calls
             search_terms = claim.get("search_terms", "")
             if search_terms:
@@ -472,22 +523,18 @@ class HallucinationEnvironment(EnvironmentInterface):
                     search_result = self.google_client.search(search_terms, num_results=2)
                     formatted_results = self._format_google_results(search_result, search_terms)
                     results.append({
-                        #"claim": claim["claim"],
-                        #"claim_type": claim.get("claim_type", ""),
-                        #"key_element": claim["key_element"],
                         "search_terms": search_terms,
                         "search_results": formatted_results
                     })
+                    num_tool_calls += 1  # Count each successful search
                 except Exception as e:
                     logging.error(f"Search failed for '{search_terms}': {e}")
                     results.append({
-                        #"claim": claim["claim"],
-                        #"key_element": claim["key_element"],
                         "search_terms": search_terms,
                         "search_results": f"Search error: {e}"
                     })
         
-        return results
+        return results, num_tool_calls
     
     def _format_google_results(self, results: List[Dict[str, str]], query: str) -> str:
         """Format Google search results for the model."""
@@ -560,7 +607,7 @@ class HallucinationEnvironment(EnvironmentInterface):
             answers=answers,
         )
     
-    def _process_claim_extraction_stage(self, response: str, metadata: HallucinationMetadata) -> Tuple[float, dict, HallucinationMetadata]:
+    def _process_claim_extraction_stage(self, response: str, metadata: HallucinationMetadata) -> Tuple[float, dict, HallucinationMetadata, Any]:
         """Process claim extraction stage and perform searches."""
         
         # Parse extracted claims
@@ -574,14 +621,15 @@ class HallucinationEnvironment(EnvironmentInterface):
             }
             return float(self.format_penalty), obs, None, None
         
-        # Perform Google searches for the extracted claims
-        search_results = self._perform_google_search(extracted_claims)
+        # Perform Google searches for the extracted claims and track tool calls
+        search_results, num_tool_calls = self._perform_google_search(extracted_claims)
         
         # Store results and prepare for error detection stage
         updated_metadata = metadata.copy()
         updated_metadata["claim_extraction_complete"] = True
         updated_metadata["extracted_claims"] = extracted_claims
         updated_metadata["search_results"] = search_results
+        updated_metadata["num_tool_calls"] = num_tool_calls  # Track tool calls
         
         # Create the observation for the error detection stage
         error_detection_prompt = format_error_detection_prompt(search_results)
@@ -599,8 +647,8 @@ class HallucinationEnvironment(EnvironmentInterface):
         
         return reward, obs, updated_metadata, answer
     
-    def _process_error_detection_stage(self, response: str, metadata: HallucinationMetadata) -> Tuple[float, dict, HallucinationMetadata]:
-        """Process error detection stage and calculate F1 score reward."""
+    def _process_error_detection_stage(self, response: str, metadata: HallucinationMetadata) -> Tuple[float, dict, Optional[HallucinationMetadata], Any]:
+        """Process error detection stage and calculate reward with new formula."""
         
         # Parse detected errors
         is_valid, detected_errors, error_msg = parse_error_detection_response(response)
@@ -613,20 +661,32 @@ class HallucinationEnvironment(EnvironmentInterface):
             }
             return float(self.format_penalty), obs, None, None
         
-        # Calculate F1 score if ground truth is available
-        reward = 0.0
+        # Get number of tool calls from metadata
+        num_tool_calls = metadata.get("num_tool_calls", 0)
+        
+        # Calculate reward with new formula
         if metadata.get("ground_truth_errors") is not None:
             ground_truth_errors = metadata["ground_truth_errors"]
+            
+            # R_Outcome: F1 score (could be replaced with LLM-as-judge)
             f1_score = calculate_f1_score(detected_errors, ground_truth_errors)
-            # Scale F1 score to a reasonable reward range
-            reward = f1_score * 10.0  # Scale to 0-10 range
+            
+            # Calculate overall reward with tool usage penalty
+            reward = calculate_overall_reward(
+                f1_score=f1_score,
+                num_tool_calls=num_tool_calls,
+                beta=self.reward_beta,
+                threshold=self.reward_threshold
+            )
+            
+            print(f"[REWARD] F1={f1_score:.3f}, Tools={num_tool_calls}, Overall={reward:.4f}")
         else:
             # If no ground truth, give a small positive reward for valid format
             reward = 0.1
         
         obs = {
             "role": "environment",
-            "content": f"<environment>Hallucination detection completed. Detected {len(detected_errors)} errors. Reward: {reward:.2f}</environment>",
+            "content": f"<environment>Hallucination detection completed. Detected {len(detected_errors)} errors. F1={f1_score if metadata.get('ground_truth_errors') else 'N/A'}, Tools={num_tool_calls}, Reward: {reward:.4f}</environment>",
         }
         
         return float(reward), obs, None, detected_errors  # Terminate episode
@@ -648,24 +708,24 @@ class HallucinationEnvironment(EnvironmentInterface):
         # For valid rewards, calculate performance metrics
         valid_rewards = rewards_np[rewards_np != self.format_penalty]
         if len(valid_rewards) > 0:
-            mean_f1_score = float(np.mean(valid_rewards) / 10.0)  # Convert back to 0-1 range
-            high_f1_rate = float(np.mean(valid_rewards > 5.0))  # F1 > 0.5
-            perfect_f1_rate = float(np.mean(valid_rewards > 9.0))  # F1 > 0.9
+            # Note: rewards are no longer scaled to 0-10, they're in 0-1 range with tool penalty
+            mean_f1_score = float(np.mean(valid_rewards))
+            high_reward_rate = float(np.mean(valid_rewards > self.reward_threshold))
+            perfect_reward_rate = float(np.mean(valid_rewards > 0.9))
         else:
             mean_f1_score = 0.0
-            high_f1_rate = 0.0
-            perfect_f1_rate = 0.0
+            high_reward_rate = 0.0
+            perfect_reward_rate = 0.0
         
         metrics = {
             "mean_reward": mean_reward,
             "format_violation_rate": format_violation_rate,
             "mean_f1_score": mean_f1_score,
-            "high_f1_rate": high_f1_rate,
-            "perfect_f1_rate": perfect_f1_rate,
+            "high_reward_rate": high_reward_rate,
+            "perfect_reward_rate": perfect_reward_rate,
             "num_samples": num_samples,
             "valid_samples": len(valid_rewards),
-            "approach": "hallucination_detection",
+            "approach": "hallucination_detection_with_tool_penalty",
         }
         
         return batch, metrics
-    
