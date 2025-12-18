@@ -2,7 +2,7 @@
 
 ## Introduction
 
-**BR-RM (Branch-and-Rethink Reasoning Reward Model)** ([Paper Link]([https://huggingface.co/datasets/nvidia/HelpSteer3](https://arxiv.org/pdf/2510.23596))) is a state-of-the-art two-turn reward modeling framework that addresses the problem of *judgment diffusion* in traditional reward models. Instead of compressing all quality dimensions into a single scalar in one pass, BR-RM uses a structured two-stage approach:
+**BR-RM (Branch-and-Rethink Reasoning Reward Model)** ([Paper Link](https://arxiv.org/pdf/2510.23596)) is a state-of-the-art two-turn reward modeling framework that addresses the problem of *judgment diffusion* in traditional reward models. Instead of compressing all quality dimensions into a single scalar in one pass, BR-RM uses a structured two-stage approach:
 
 - **Turn 1: Adaptive Branching** - The model selects 1-3 instance-critical evaluation dimensions (e.g., factuality, safety, logical reasoning) and generates focused issue analyses for each response.
 - **Turn 2: Branch-Conditioned Rethinking** - Using findings from Turn 1, the model performs a targeted re-evaluation through the lens of the selected dimensions, applying task-specific evaluation hierarchies to produce a final preference judgment.
