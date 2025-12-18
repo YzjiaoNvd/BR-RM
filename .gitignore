@@ -48,3 +48,8 @@ code_snapshots*/
 !default_runtime_env.yaml
 dataset/train_data.jsonl
 .github/workflows/
+
+
+# specific 
+grpo_brrm_multinode_8b.sh
+grpo_brrm_multinode_14b.sh
