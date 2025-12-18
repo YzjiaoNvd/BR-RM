@@ -4,9 +4,6 @@ set -x
 
 GPFS="./BR-RM"
 CONTAINER=${YOUR_CONTAINER_PATH_HERE}
-export HF_HOME=YOUR_HF_HOME_HERE
-export HF_TOKEN=YOUR_HF_TOKEN_HERE
-
 
 # Number of nodes for the job
 NUM_ACTOR_NODES=2
