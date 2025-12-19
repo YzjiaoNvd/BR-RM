@@ -1,8 +1,8 @@
-# BR-RM: Branch-and-Rethink Reasoning Reward Model
+# Code for Branch-and-Rethink Reasoning Reward Model
 
 ## Introduction
 
-**BR-RM (Branch-and-Rethink Reasoning Reward Model)** is a state-of-the-art two-turn reward modeling framework that addresses the problem of *judgment diffusion* in traditional reward models. Instead of compressing all quality dimensions into a single scalar in one pass, BR-RM uses a structured two-stage approach:
+**BR-RM (Branch-and-Rethink Reasoning Reward Model)** ([Paper Link](https://arxiv.org/pdf/2510.23596)) is a state-of-the-art two-turn reward modeling framework that addresses the problem of *judgment diffusion* in traditional reward models. Instead of compressing all quality dimensions into a single scalar in one pass, BR-RM uses a structured two-stage approach:
 
 - **Turn 1: Adaptive Branching** - The model selects 1-3 instance-critical evaluation dimensions (e.g., factuality, safety, logical reasoning) and generates focused issue analyses for each response.
 - **Turn 2: Branch-Conditioned Rethinking** - Using findings from Turn 1, the model performs a targeted re-evaluation through the lens of the selected dimensions, applying task-specific evaluation hierarchies to produce a final preference judgment.
@@ -18,6 +18,14 @@ This approach achieves state-of-the-art performance on three challenging reward 
 - ✅ GRPO-style reinforcement learning with binary outcome rewards
 - ✅ Built on NeMo-RL for scalability (1B to 100B+ parameters)
 - ✅ Compatible with standard RLHF pipelines
+
+
+### Model Checkpoints on Hugging Face
+
+BR-RM models are available on Hugging Face:
+- [`nvidia/Qwen3-Nemotron-14B-BRRM`](https://huggingface.co/nvidia/Qwen3-Nemotron-14B-BRRM)
+- [`nvidia/Qwen3-Nemotron-8B-BRRM`](https://huggingface.co/nvidia/Qwen3-Nemotron-8B-BRRM)
+
 
 ## How to Run
 
@@ -127,14 +135,14 @@ The training uses:
 
 #### Existing Model Checkpoints on Hugging Face
 
-Pre-trained BR-RM models will be available on Hugging Face (coming soon):
-- `nvidia/BR-RM-Qwen3-8B` 
-- `nvidia/BR-RM-Qwen3-14B`
+BR-RM models are available on Hugging Face:
+- [`nvidia/Qwen3-Nemotron-14B-BRRM`](https://huggingface.co/nvidia/Qwen3-Nemotron-14B-BRRM)
+- [`nvidia/Qwen3-Nemotron-8B-BRRM`](https://huggingface.co/nvidia/Qwen3-Nemotron-8B-BRRM)
 
 To use pre-trained checkpoints:
 ```bash
 uv run python examples/run_eval_brrm.py \
-    ++generation.model_name="nvidia/BR-RM-Qwen3-14B" \
+    ++generation.model_name="nvidia/Qwen3-Nemotron-8B-BRRM" \
     --dataset rewardbench
 ```
 
@@ -317,7 +325,7 @@ Evaluation Flow:
 
 If you use BR-RM in your research, please cite:
 ```bibtex
-@article{jiao2025branchrethinkreward,
+@article{jiao2025think,
   title={Think Twice: Branch-and-Rethink Reasoning Reward Model},
   author={Jiao, Yizhu and Zeng, Jiaqi and Vialard, Julien Veron and Kuchaiev, Oleksii and Han, Jiawei and Delalleau, Olivier},
   journal={arXiv preprint arXiv:2510.23596},
