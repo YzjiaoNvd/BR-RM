@@ -325,7 +325,7 @@ Evaluation Flow:
 
 If you use BR-RM in your research, please cite:
 ```bibtex
-@article{jiao2025branchrethinkreward,
+@article{jiao2025think,
   title={Think Twice: Branch-and-Rethink Reasoning Reward Model},
   author={Jiao, Yizhu and Zeng, Jiaqi and Vialard, Julien Veron and Kuchaiev, Oleksii and Han, Jiawei and Delalleau, Olivier},
   journal={arXiv preprint arXiv:2510.23596},
